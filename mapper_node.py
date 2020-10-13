@@ -57,7 +57,10 @@ def main():
         exit()
 
     message = kv.read_store(kv_conn, job_id + '_input')
-    map_result = run_map(bytes(config['map_fn']),job_id + '_input', message)
+    message_list = message.split('#\r#')[1:]
+    map_result = []
+    for i in range(0, len(message_list), 2):
+        map_result = map_result + run_map(bytes(config['map_fn']),message_list[i], message_list[i+1])
     partition_map = partition_intermediate_results(map_result, reducer_node)
     store_intermediate_results(partition_map)
     kv.close_store_connection(kv_conn)

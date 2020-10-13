@@ -25,7 +25,7 @@ def process_data_file(file_path: str, mapper_jobids: list):
         if key in split_input:
             split_input[key] = split_input[key] + " " + line
         else:
-            split_input[key] = line
+            split_input[key] = "#\r#{0}#\r#{1}".format(file_path,line)
         # kv.append_command(kv_conn,key,size,line)
         count += 1
     status = [kv.append_command(kv_conn,key,len(split_input[key].strip().encode()),split_input[key].strip()) 
