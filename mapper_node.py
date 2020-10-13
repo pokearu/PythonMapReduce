@@ -1,13 +1,24 @@
-import marshal, types
+import marshal, types, uuid, json
 import kvstore as kv
 import sys
 
 kv_conn = kv.get_store_connection()
 
-job_id = sys.argv[1]
+job_id = str(uuid.uuid1())
 
-def partition_intermediate_results(map_result: list) -> dict:
-    partition_fn = lambda x : int(''.join([str(ord(c)) for c in x])) % 3
+def wait_for_config():
+    print("{0} waiting".format(job_id))
+    while True:
+        config = kv.read_store(kv_conn, job_id + '_config')
+        if config != '\r':
+            return config
+            # break
+        else:
+            continue
+
+
+def partition_intermediate_results(map_result: list, reducers: int) -> dict:
+    partition_fn = lambda x : int(''.join([str(ord(c)) for c in x])) % reducers
     partition_map = {}
     for result in map_result:
         key = "partition_{0}".format(partition_fn(result[0]))
@@ -24,7 +35,7 @@ def store_intermediate_results(partition_map: dict):
         res = kv.append_command(kv_conn, key, len(str(partition_map[key]).encode()), str(partition_map[key]))
         if res != "STORED\r\n":
             print("Error: " + res)
-            exit()    
+            exit()
     kv.set_command(kv_conn, job_id + '_status',len("DONE".encode()),"DONE")
 
 def run_map(map_func: bytes,key: str,value: str) -> list:
@@ -33,15 +44,21 @@ def run_map(map_func: bytes,key: str,value: str) -> list:
     return mapper(key, value)
 
 def main():
+    res = kv.append_command(kv_conn, 'mapper_jobids',len(job_id.encode()), job_id)
+    if res != "STORED\r\n":
+        print(res)
+        exit()
+    config = json.loads(wait_for_config())
+    reducer_node = config['reducer_node']
+
     res = kv.set_command(kv_conn, job_id + '_status',len("STARTED".encode()),"STARTED")
     if res != "STORED\r\n":
         print(res)
         exit()
 
     message = kv.read_store(kv_conn, job_id + '_input')
-    map_result = run_map(b'\xe3\x02\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x03\x00\x00\x00C\x00\x00\x00s\x12\x00\x00\x00d\x01d\x02\x84\x00|\x01\xa0\x00\xa1\x00D\x00\x83\x01S\x00)\x03Nc\x01\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x04\x00\x00\x00S\x00\x00\x00s\x14\x00\x00\x00g\x00|\x00]\x0c}\x01|\x01d\x00f\x02\x91\x02q\x04S\x00)\x01\xe9\x01\x00\x00\x00\xa9\x00)\x02\xda\x02.0\xda\x04wordr\x02\x00\x00\x00r\x02\x00\x00\x00\xfa\x0fmapreduce_wc.py\xfa\n<listcomp>\x0c\x00\x00\x00s\x02\x00\x00\x00\x06\x00z\x1eword_count.<locals>.<listcomp>)\x01\xda\x05split)\x02\xda\tfile_name\xda\rfile_contentsr\x02\x00\x00\x00r\x02\x00\x00\x00r\x05\x00\x00\x00\xda\nword_count\x0b\x00\x00\x00s\x02\x00\x00\x00\x00\x01'
-    , job_id + '_input', message)
-    partition_map = partition_intermediate_results(map_result)
+    map_result = run_map(bytes(config['map_fn']),job_id + '_input', message)
+    partition_map = partition_intermediate_results(map_result, reducer_node)
     store_intermediate_results(partition_map)
     kv.close_store_connection(kv_conn)
 
