@@ -49,7 +49,7 @@ def get_mapper_jobids():
 
 def start_mapper_jobs():
     nodes_count = config['mapper'].getint('nodes')
-    status = [subprocess.Popen(['python', 'mapper_node.py']) for i in range(nodes_count)]
+    status = [subprocess.Popen(['python3', 'mapper_node.py']) for i in range(nodes_count)]
     return status
 
 def get_reducer_jobids():
@@ -68,7 +68,7 @@ def get_reducer_jobids():
 
 def start_reducer_jobs():
     nodes_count = config['reducer'].getint('nodes')
-    status = [subprocess.Popen(['python', 'reducer_node.py']) for i in range(nodes_count)]
+    status = [subprocess.Popen(['python3', 'reducer_node.py']) for i in range(nodes_count)]
     return status
 
 def wait_for_mappers(mapper_jobids: list):
