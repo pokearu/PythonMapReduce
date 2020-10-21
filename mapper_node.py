@@ -4,7 +4,7 @@ import sys
 
 kv_conn = kv.get_store_connection()
 
-job_id = os.environ.get('JOBID')
+job_id = sys.argv[1]
 # job_id = str(uuid.uuid1())
 
 def wait_for_config():
