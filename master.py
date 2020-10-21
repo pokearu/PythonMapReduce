@@ -60,7 +60,7 @@ def start_mapper_jobs(mapper_jobids: list):
 
     '''
     gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
-    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id, reducer_jobids)), shell=True) for job_id in mapper_jobids]
+    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id)), shell=True) for job_id in mapper_jobids]
     return status
 
 def get_reducer_jobids():
