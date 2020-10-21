@@ -48,7 +48,7 @@ def get_mapper_jobids():
 
     return [str(uuid.uuid1()) for i in range(nodes_count)]
 
-def start_mapper_jobs(mapper_jobids: list):
+def start_mapper_jobs(mapper_jobids: list, reducer_jobids: str):
     start_up_script = '''
         #! /bin/bash
         sudo apt update
@@ -56,11 +56,11 @@ def start_mapper_jobs(mapper_jobids: list):
         sudo apt -y python3.8
         git clone https://github.com/pokearu/PythonMapReduce.git
         cd PythonMapReduce
-        sudo python3 mapper_node.py {0}
+        sudo python3 mapper_node.py {0} {1}
 
     '''
     gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
-    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id)), shell=True) for job_id in mapper_jobids]
+    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id, reducer_jobids)), shell=True) for job_id in mapper_jobids]
     return status
 
 def get_reducer_jobids():
@@ -126,7 +126,7 @@ def get_user_reduce() -> list:
 def update_reducer_config(reducer_jobids: list):
     for i in range(len(reducer_jobids)):
         reducer_config = {}
-        reducer_config['partition_key'] = "partition_{0}".format(i)
+        reducer_config['partition_key'] = "partition_{0}".format(reducer_jobids[i])
         reducer_config['reduce_fn'] = get_user_reduce()
         reducer_config = json.dumps(reducer_config)
         res = kv.set_command(kv_conn, reducer_jobids[i] + '_config',len(str(reducer_config).encode()), str(reducer_config))
@@ -150,8 +150,6 @@ def consolidate_output(reducer_jobids: list, output_file_path: str):
         output.writelines(reducer_output)
 
 def clean_up(mapper_jobids: list, reducer_jobids: list):
-    # kv.delete_command(kv_conn,"mapper_jobids")
-    # kv.delete_command(kv_conn,"reducer_jobids")
     # Delete mapper VMs
     nodes_count = config['mapper'].getint('nodes')
     gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b --quiet"
@@ -166,10 +164,12 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
     [kv.delete_command(kv_conn,"{0}_result".format(job_id)) for job_id in reducer_jobids]
 
 def main():
-    try:    
-        # Step 1 : Start the Mapper Nodes
+    try:
+        # Step 0 : Initialize Mapper and Reducer Job IDs
         mapper_jobids = get_mapper_jobids()
-        status = start_mapper_jobs(mapper_jobids)
+        reducer_jobids = get_reducer_jobids()  
+        # Step 1 : Start the Mapper Nodes
+        status = start_mapper_jobs(mapper_jobids,",".join(reducer_jobids))
         # Step 2 : Distribute the Input files
         input_files = json.loads(config.get('master','input_file'))
         split_status = [process_data_file(file_path, mapper_jobids) for file_path in input_files]
@@ -178,7 +178,6 @@ def main():
         # Step 4 : Wait for mappers to finish
         wait_for_mappers(mapper_jobids)
         # Step 5 : Start the Reducer Nodes
-        reducer_jobids = get_reducer_jobids()
         status = start_reducer_jobs(reducer_jobids)
         # Step 6 : Update the config for reducers
         update_reducer_config(reducer_jobids)

@@ -5,6 +5,7 @@ import sys
 kv_conn = kv.get_store_connection()
 
 job_id = sys.argv[1]
+reducer_jobids = sys.argv[2].split(',')
 # job_id = str(uuid.uuid1())
 
 def wait_for_config():
@@ -22,7 +23,7 @@ def partition_intermediate_results(map_result: list, reducers: int) -> dict:
     partition_fn = lambda x : int(''.join([str(ord(c)) for c in x])) % reducers
     partition_map = {}
     for result in map_result:
-        key = "partition_{0}".format(partition_fn(result[0]))
+        key = "partition_{0}".format(reducer_jobids[partition_fn(result[0])])
         # Reformat the tuples fpr storage
         result = '{0}\t{1}'.format(result[0],result[1])
         if key in partition_map:
