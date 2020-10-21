@@ -49,7 +49,6 @@ def get_mapper_jobids():
     return [str(uuid.uuid1()) for i in range(nodes_count)]
 
 def start_mapper_jobs(mapper_jobids: list):
-    # nodes_count = config['mapper'].getint('nodes')
     start_up_script = '''
         #! /bin/bash
         sudo apt update
@@ -66,22 +65,31 @@ def start_mapper_jobs(mapper_jobids: list):
 
 def get_reducer_jobids():
     nodes_count = config['reducer'].getint('nodes')
-    reducer_jobids = []
-    while True:
-        reducer_jobids = kv.read_store(kv_conn, 'reducer_jobids').split()
-        if len(reducer_jobids) == nodes_count:
-            print("All Reducers have started.")
-            break
-        else:
-            continue
-    
-    return reducer_jobids
-    # return [str(uuid.uuid1()) for i in range(nodes_count)]
+    # reducer_jobids = []
+    # while True:
+    #     reducer_jobids = kv.read_store(kv_conn, 'reducer_jobids').split()
+    #     if len(reducer_jobids) == nodes_count:
+    #         print("All Reducers have started.")
+    #         break
+    #     else:
+    #         continue
+    # return reducer_jobids
+    return [str(uuid.uuid1()) for i in range(nodes_count)]
 
-def start_reducer_jobs():
-    nodes_count = config['reducer'].getint('nodes')
-    gcloud_command = "gcloud compute instances create reducer-{0} --zone=us-east1-b --metadata-from-file startup-script=./reducer.sh"
-    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
+def start_reducer_jobs(reducer_jobids: list):
+    # nodes_count = config['reducer'].getint('nodes')
+    start_up_script = '''
+        #! /bin/bash
+        sudo apt update
+        sudo apt -y install git
+        sudo apt -y python3.8
+        git clone https://github.com/pokearu/PythonMapReduce.git
+        cd PythonMapReduce
+        sudo python3 reducer_node.py {0}
+
+    '''
+    gcloud_command = "gcloud compute instances create reducer-{0} --zone=us-east1-b --metadata startup-script='{1}'"
+    status = [subprocess.run(gcloud_command.format(job_id,start_up_script.format(job_id)), shell=True) for job_id in reducer_jobids]
     return status
 
 def wait_for_mappers(mapper_jobids: list):
@@ -142,16 +150,16 @@ def consolidate_output(reducer_jobids: list, output_file_path: str):
         output.writelines(reducer_output)
 
 def clean_up(mapper_jobids: list, reducer_jobids: list):
-    kv.delete_command(kv_conn,"mapper_jobids")
-    kv.delete_command(kv_conn,"reducer_jobids")
+    # kv.delete_command(kv_conn,"mapper_jobids")
+    # kv.delete_command(kv_conn,"reducer_jobids")
     # Delete mapper VMs
     nodes_count = config['mapper'].getint('nodes')
     gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b --quiet"
-    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
+    status = [subprocess.run(gcloud_command.format(job_id), shell=True) for job_id in mapper_jobids]
     # Delete reducer VMs
     nodes_count = config['reducer'].getint('nodes')
     gcloud_command = "gcloud compute instances delete reducer-{0} --zone=us-east1-b --quiet"
-    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
+    status = [subprocess.run(gcloud_command.format(job_id), shell=True) for job_id in reducer_jobids]
     # Delete intermediate data
     [kv.delete_command(kv_conn,"partition_{0}".format(i)) for i in range(nodes_count)]
     [kv.delete_command(kv_conn,"{0}_input".format(job_id)) for job_id in mapper_jobids]
@@ -170,8 +178,8 @@ def main():
         # Step 4 : Wait for mappers to finish
         wait_for_mappers(mapper_jobids)
         # Step 5 : Start the Reducer Nodes
-        status = start_reducer_jobs()
         reducer_jobids = get_reducer_jobids()
+        status = start_reducer_jobs(reducer_jobids)
         # Step 6 : Update the config for reducers
         update_reducer_config(reducer_jobids)
         # Step 7 : Wait for reducers to finish

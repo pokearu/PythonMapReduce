@@ -3,7 +3,7 @@ import kvstore as kv
 
 kv_conn = kv.get_store_connection()
 
-job_id = str(uuid.uuid1())
+job_id = sys.argv[1]
 
 def wait_for_config():
     print("{0} waiting".format(job_id))
@@ -44,9 +44,9 @@ def run_reduce(reduce_func: bytes, key:str, value: list):
 
 def main():
 
-    res = kv.append_command(kv_conn, 'reducer_jobids',len(job_id.encode()), job_id)
-    if res != "STORED\r\n":
-        print(res)
+    # res = kv.append_command(kv_conn, 'reducer_jobids',len(job_id.encode()), job_id)
+    if job_id == None:
+        print("Job Initialization Error!")
         exit()
     
     config = json.loads(wait_for_config())
