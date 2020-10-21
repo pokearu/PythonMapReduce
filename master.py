@@ -159,9 +159,12 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
     gcloud_command = "gcloud compute instances delete reducer-{0} --zone=us-east1-b --quiet"
     status = [subprocess.run(gcloud_command.format(job_id), shell=True) for job_id in reducer_jobids]
     # Delete intermediate data
-    [kv.delete_command(kv_conn,"partition_{0}".format(i)) for i in range(nodes_count)]
+    [kv.delete_command(kv_conn,"partition_{0}".format(job_id)) for job_id in reducer_jobids]
     [kv.delete_command(kv_conn,"{0}_input".format(job_id)) for job_id in mapper_jobids]
     [kv.delete_command(kv_conn,"{0}_result".format(job_id)) for job_id in reducer_jobids]
+    # Delete Job Configs
+    [kv.delete_command(kv_conn,"{0}_config".format(job_id)) for job_id in mapper_jobids]
+    [kv.delete_command(kv_conn,"{0}_config".format(job_id)) for job_id in reducer_jobids]
 
 def main():
     try:
