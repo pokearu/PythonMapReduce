@@ -69,7 +69,8 @@ def get_reducer_jobids():
 
 def start_reducer_jobs():
     nodes_count = config['reducer'].getint('nodes')
-    status = [subprocess.Popen(['python3', 'reducer_node.py']) for i in range(nodes_count)]
+    gcloud_command = "gcloud compute instances create reducer-{0} --zone=us-east1-b --metadata-from-file startup-script=./reducer.sh"
+    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
     return status
 
 def wait_for_mappers(mapper_jobids: list):
@@ -134,10 +135,13 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
     kv.delete_command(kv_conn,"reducer_jobids")
     # Delete mapper VMs
     nodes_count = config['mapper'].getint('nodes')
-    gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b"
+    gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b --quiet"
     status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
-    # Delete reducer
+    # Delete reducer VMs
     nodes_count = config['reducer'].getint('nodes')
+    gcloud_command = "gcloud compute instances delete reducer-{0} --zone=us-east1-b --quiet"
+    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
+    # Delete intermediate data
     [kv.delete_command(kv_conn,"partition_{0}".format(i)) for i in range(nodes_count)]
     [kv.delete_command(kv_conn,"{0}_input".format(job_id)) for job_id in mapper_jobids]
     [kv.delete_command(kv_conn,"{0}_result".format(job_id)) for job_id in reducer_jobids]
