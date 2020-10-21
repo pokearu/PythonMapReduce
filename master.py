@@ -48,7 +48,7 @@ def get_mapper_jobids():
 
     return [str(uuid.uuid1()) for i in range(nodes_count)]
 
-def start_mapper_jobs(mapper_jobids: list, reducer_jobids: str):
+def start_mapper_jobs(mapper_jobids: list):
     start_up_script = '''
         #! /bin/bash
         sudo apt update
@@ -56,7 +56,7 @@ def start_mapper_jobs(mapper_jobids: list, reducer_jobids: str):
         sudo apt -y python3.8
         git clone https://github.com/pokearu/PythonMapReduce.git
         cd PythonMapReduce
-        sudo python3 mapper_node.py {0} "{1}"
+        sudo python3 mapper_node.py {0}
 
     '''
     gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
@@ -101,11 +101,11 @@ def wait_for_mappers(mapper_jobids: list):
         else:
             continue
 
-def update_mapper_config(mapper_jobids: list):
-    nodes_count = config['reducer'].getint('nodes')
+def update_mapper_config(mapper_jobids: list, reducer_jobids: list):
+    # nodes_count = config['reducer'].getint('nodes')
     for job_id in mapper_jobids:
         mapper_config = {}
-        mapper_config['reducer_node'] = nodes_count
+        mapper_config['reducer_node'] = reducer_jobids
         mapper_config['map_fn'] = get_user_map()
         mapper_config = json.dumps(mapper_config)
         res = kv.set_command(kv_conn, job_id + '_config',len(mapper_config.encode()), mapper_config)
@@ -169,12 +169,12 @@ def main():
         mapper_jobids = get_mapper_jobids()
         reducer_jobids = get_reducer_jobids()  
         # Step 1 : Start the Mapper Nodes
-        status = start_mapper_jobs(mapper_jobids,",".join(reducer_jobids))
+        status = start_mapper_jobs(mapper_jobids)
         # Step 2 : Distribute the Input files
         input_files = json.loads(config.get('master','input_file'))
         split_status = [process_data_file(file_path, mapper_jobids) for file_path in input_files]
         # Step 3 : Update the config for mappers
-        update_mapper_config(mapper_jobids)
+        update_mapper_config(mapper_jobids, reducer_jobids)
         # Step 4 : Wait for mappers to finish
         wait_for_mappers(mapper_jobids)
         # Step 5 : Start the Reducer Nodes
