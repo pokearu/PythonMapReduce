@@ -56,7 +56,7 @@ def start_mapper_jobs(mapper_jobids: list, reducer_jobids: str):
         sudo apt -y python3.8
         git clone https://github.com/pokearu/PythonMapReduce.git
         cd PythonMapReduce
-        sudo python3 mapper_node.py {0} {1}
+        sudo python3 mapper_node.py {0} "{1}"
 
     '''
     gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
