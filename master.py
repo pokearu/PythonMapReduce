@@ -35,22 +35,34 @@ def process_data_file(file_path: str, mapper_jobids: list):
 
 def get_mapper_jobids():
     nodes_count = config['mapper'].getint('nodes')
-    mapper_jobids = []
-    while True:
-        mapper_jobids = kv.read_store(kv_conn, 'mapper_jobids').split()
-        if len(mapper_jobids) == nodes_count:
-            print("All Mappers have started.")
-            break
-        else:
-            continue
+    # mapper_jobids = []
+    # while True:
+    #     mapper_jobids = kv.read_store(kv_conn, 'mapper_jobids').split()
+    #     if len(mapper_jobids) == nodes_count:
+    #         print("All Mappers have started.")
+    #         break
+    #     else:
+    #         continue
     
-    return mapper_jobids
-    # return [str(uuid.uuid1()) for i in range(nodes_count)]
+    # return mapper_jobids
 
-def start_mapper_jobs():
-    nodes_count = config['mapper'].getint('nodes')
-    gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata-from-file startup-script=./mapper.sh"
-    status = [subprocess.run(gcloud_command.format(i), shell=True) for i in range(nodes_count)]
+    return [str(uuid.uuid1()) for i in range(nodes_count)]
+
+def start_mapper_jobs(mapper_jobids: list):
+    # nodes_count = config['mapper'].getint('nodes')
+    start_up_script = '''
+        #! /bin/bash
+        sudo apt update
+        sudo apt -y install git
+        sudo apt -y python3.8
+        git clone https://github.com/pokearu/PythonMapReduce.git
+        cd PythonMapReduce
+        export JOBID="{0}"
+        sudo python3 mapper_node.py
+
+    '''
+    gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
+    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id)), shell=True) for job_id in mapper_jobids]
     return status
 
 def get_reducer_jobids():
@@ -149,8 +161,8 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
 def main():
     try:    
         # Step 1 : Start the Mapper Nodes
-        status = start_mapper_jobs()
         mapper_jobids = get_mapper_jobids()
+        status = start_mapper_jobs(mapper_jobids)
         # Step 2 : Distribute the Input files
         input_files = json.loads(config.get('master','input_file'))
         split_status = [process_data_file(file_path, mapper_jobids) for file_path in input_files]
