@@ -23,7 +23,7 @@ def delete_vm(instance_name:str, zone:str):
     '''
     This function runs a gcloud cli command to delete compute VM
     '''
-    gcloud_command = "gcloud compute instances delete {0} --zone={1} --format=josn --quiet".format(instance_name, zone)
+    gcloud_command = "gcloud compute instances delete {0} --zone={1} --format=json --quiet".format(instance_name, zone)
     process = subprocess.run(gcloud_command, shell=True, capture_output=True)
     stdout, stderr = process.stdout.decode(encoding='utf-8'), process.stderr.decode(encoding='utf-8')
     if 'ERROR' in stderr:
