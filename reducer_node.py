@@ -1,12 +1,13 @@
 import marshal, types, sys, uuid, json
 import kvstore as kv
+import logging
 
 kv_conn = kv.get_store_connection()
 
 job_id = sys.argv[1]
 
 def wait_for_config():
-    print("{0} waiting".format(job_id))
+    logging.info("{0} waiting for config".format(job_id))
     while True:
         config = kv.read_store(kv_conn, job_id + '_config')
         if config != '\r':
@@ -20,8 +21,9 @@ def store_reduce_output(reduce_output: list):
                                 for output in reduce_output])
     res = kv.set_command(kv_conn, job_id + '_result', len(output_contents.encode('utf-8')), output_contents)
     if res != "STORED\r\n":
-        print("Error: " + res)
-        exit()    
+        logging.error("Final results set failure : %s",res)
+        logging.critical("ABORTING")
+        exit()
     kv.set_command(kv_conn, job_id + '_status',len("DONE".encode()),"DONE")
 
 def sort_intermediate_results(value: str):
@@ -44,16 +46,16 @@ def run_reduce(reduce_func: bytes, key:str, value: list):
 
 def main():
 
-    # res = kv.append_command(kv_conn, 'reducer_jobids',len(job_id.encode()), job_id)
     if job_id == None:
-        print("Job Initialization Error!")
+        logging.critical("Job Initialization Error! ABORTING")
         exit()
     
     config = json.loads(wait_for_config())
     partition_key = config['partition_key']
     res = kv.set_command(kv_conn, job_id + '_status',len("STARTED".encode()),"STARTED")
     if res != "STORED\r\n":
-        print(res)
+        logging.error("Status set failure : %s",res)
+        logging.critical("ABORTING")
         exit()
 
     message = kv.read_store(kv_conn, partition_key)
@@ -67,4 +69,6 @@ def main():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(filename='reducer.log', format='%(asctime)s %(levelname)s %(message)s', 
+        level=logging.DEBUG)
     main()

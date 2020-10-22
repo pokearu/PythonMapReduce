@@ -3,6 +3,8 @@ import subprocess
 import configparser
 import uuid
 import json
+import logging
+import gcloud_cli as gcli
 
 config = configparser.ConfigParser()
 config.read('master.ini')
@@ -20,13 +22,11 @@ def process_data_file(file_path: str, mapper_jobids: list):
             # end of file is reached
             break
         line = line.strip()
-        # size = len(line.encode('utf-8'))
         key = mapper_jobids[count % nodes] + '_input'
         if key in split_input:
             split_input[key] = split_input[key] + " " + line
         else:
             split_input[key] = "#\r#{0}#\r#{1}".format(file_path,line)
-        # kv.append_command(kv_conn,key,size,line)
         count += 1
     status = [kv.append_command(kv_conn,key,len(split_input[key].strip().encode()),split_input[key].strip()) 
                     for key in split_input]
@@ -59,8 +59,9 @@ def start_mapper_jobs(mapper_jobids: list):
         sudo python3 mapper_node.py {0}
 
     '''
-    gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
-    status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id)), shell=True) for job_id in mapper_jobids]
+    status = [gcli.create_vm("mapper-{0}".format(job_id), "us-east1-b", start_up_script.format(job_id)) for job_id in mapper_jobids]
+    # gcloud_command = "gcloud compute instances create mapper-{0} --zone=us-east1-b --metadata startup-script='{1}'"
+    # status = [subprocess.run(gcloud_command.format(job_id, start_up_script.format(job_id)), shell=True) for job_id in mapper_jobids]
     return status
 
 def get_reducer_jobids():
@@ -88,21 +89,21 @@ def start_reducer_jobs(reducer_jobids: list):
         sudo python3 reducer_node.py {0}
 
     '''
-    gcloud_command = "gcloud compute instances create reducer-{0} --zone=us-east1-b --metadata startup-script='{1}'"
-    status = [subprocess.run(gcloud_command.format(job_id,start_up_script.format(job_id)), shell=True) for job_id in reducer_jobids]
+    status = [gcli.create_vm("reducer-{0}".format(job_id), "us-east1-b", start_up_script.format(job_id)) for job_id in reducer_jobids]
+    # gcloud_command = "gcloud compute instances create reducer-{0} --zone=us-east1-b --metadata startup-script='{1}'"
+    # status = [subprocess.run(gcloud_command.format(job_id,start_up_script.format(job_id)), shell=True) for job_id in reducer_jobids]
     return status
 
 def wait_for_mappers(mapper_jobids: list):
     while True:
         statuses = [kv.read_store(kv_conn, job_id + '_status') for job_id in mapper_jobids]
         if all(status == "DONE\r" for status in statuses):
-            print("Mappers Completed - status\n{0}".format(statuses))
+            logging.debug("Mappers Completed - status\n{0}".format(statuses))
             break
         else:
             continue
 
 def update_mapper_config(mapper_jobids: list, reducer_jobids: list):
-    # nodes_count = config['reducer'].getint('nodes')
     for job_id in mapper_jobids:
         mapper_config = {}
         mapper_config['reducer_node'] = reducer_jobids
@@ -110,7 +111,8 @@ def update_mapper_config(mapper_jobids: list, reducer_jobids: list):
         mapper_config = json.dumps(mapper_config)
         res = kv.set_command(kv_conn, job_id + '_config',len(mapper_config.encode()), mapper_config)
         if res != "STORED\r\n":
-            print(res)
+            logging.error("Update mapper config failed : %s", res)
+            logging.critical("ABORTING JOB")
             exit()
 
 def get_user_map() -> list:
@@ -131,14 +133,15 @@ def update_reducer_config(reducer_jobids: list):
         reducer_config = json.dumps(reducer_config)
         res = kv.set_command(kv_conn, reducer_jobids[i] + '_config',len(str(reducer_config).encode()), str(reducer_config))
         if res != "STORED\r\n":
-            print(res)
+            logging.error("Update reducer config failed : %s", res)
+            logging.critical("ABORTING JOB")
             exit()
 
 def wait_for_reducers(reducer_jobids: list):
     while True:
         statuses = [kv.read_store(kv_conn, job_id + '_status') for job_id in reducer_jobids]
         if all(status == "DONE\r" for status in statuses):
-            print("Reducers Completed - status\n{0}".format(statuses))
+            logging.debug("Reducers Completed - status\n{0}".format(statuses))
             break
         else:
             continue
@@ -151,13 +154,17 @@ def consolidate_output(reducer_jobids: list, output_file_path: str):
 
 def clean_up(mapper_jobids: list, reducer_jobids: list):
     # Delete mapper VMs
-    nodes_count = config['mapper'].getint('nodes')
-    gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b --quiet"
-    status = [subprocess.run(gcloud_command.format(job_id), shell=True) for job_id in mapper_jobids]
+    # nodes_count = config['mapper'].getint('nodes')
+    # gcloud_command = "gcloud compute instances delete mapper-{0} --zone=us-east1-b --quiet"
+    status = [gcli.delete_vm("mapper-{0}".format(job_id), "us-east1-b") for job_id in mapper_jobids]
+    if all(vm == "DELETED\r" for vm in status):
+        logging.debug("All Mappers have been deleted")
     # Delete reducer VMs
-    nodes_count = config['reducer'].getint('nodes')
-    gcloud_command = "gcloud compute instances delete reducer-{0} --zone=us-east1-b --quiet"
-    status = [subprocess.run(gcloud_command.format(job_id), shell=True) for job_id in reducer_jobids]
+    # nodes_count = config['reducer'].getint('nodes')
+    # gcloud_command = "gcloud compute instances delete reducer-{0} --zone=us-east1-b --quiet"
+    status = [gcli.delete_vm("reducer-{0}".format(job_id), "us-east1-b") for job_id in reducer_jobids]
+    if all(vm == "DELETED\r" for vm in status):
+        logging.debug("All Reducers have been deleted")
     # Delete intermediate data
     [kv.delete_command(kv_conn,"partition_{0}".format(job_id)) for job_id in reducer_jobids]
     [kv.delete_command(kv_conn,"{0}_input".format(job_id)) for job_id in mapper_jobids]
@@ -168,33 +175,50 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
 
 def main():
     try:
-        # Step 0 : Initialize Mapper and Reducer Job IDs
+        logging.info("Step 0 : Initializing Mapper and Reducer Job IDs")
         mapper_jobids = get_mapper_jobids()
-        reducer_jobids = get_reducer_jobids()  
-        # Step 1 : Start the Mapper Nodes
+        reducer_jobids = get_reducer_jobids()
+        logging.debug("Mapper Job IDs : %s Reducer Job IDs : %s", mapper_jobids, reducer_jobids)
+
+        logging.info("Step 1 : Starting the Mapper Nodes")
         status = start_mapper_jobs(mapper_jobids)
-        # Step 2 : Distribute the Input files
+        if all(vm == "RUNNING\r" for vm in status):
+            logging.debug("All Mappers have started")
+        
+        logging.info("Step 2 : Distribute the Input files")
         input_files = json.loads(config.get('master','input_file'))
         split_status = [process_data_file(file_path, mapper_jobids) for file_path in input_files]
-        # Step 3 : Update the config for mappers
+        if all(status == "DONE\r" for status in split_status):
+            logging.debug("Completed data set distribution")
+        
+        logging.info("Step 3 : Update the mapper configs")
         update_mapper_config(mapper_jobids, reducer_jobids)
-        # Step 4 : Wait for mappers to finish
+
+        logging.info("Step 4 : Waiting for mappers to finish")
         wait_for_mappers(mapper_jobids)
-        # Step 5 : Start the Reducer Nodes
+
+        logging.info("Step 5 : Starting the Reducer Nodes")
         status = start_reducer_jobs(reducer_jobids)
-        # Step 6 : Update the config for reducers
+        if all(vm == "RUNNING\r" for vm in status):
+            logging.debug("All Reducers have started")
+
+        logging.info("Step 6 : Update the reducer config")
         update_reducer_config(reducer_jobids)
-        # Step 7 : Wait for reducers to finish
+
+        logging.info("Step 7 : Waiting for reducers to finish")
         wait_for_reducers(reducer_jobids)
-        # Step 8 : Consolidate output file
+
+        logging.info("Step 8 : Consolidating output file")
         consolidate_output(reducer_jobids,config.get('master','output_file'))
     except Exception as e:
-        print(e)
+        logging.critical("JOB FAILED : %s",e)
     finally:
-        # Step 9 : Clean up intermediate data
+        logging.info("Step 9 : Clean up VMs and intermediate data")
         clean_up(mapper_jobids, reducer_jobids)
         kv.close_store_connection(kv_conn)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(filename='master.log', format='%(asctime)s %(levelname)s %(message)s', 
+        level=logging.DEBUG)
     main()
