@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, send_from_directory
 import subprocess
 import logging, uuid
 import configparser
@@ -6,7 +6,7 @@ import kvstore as kv
 
 config = configparser.ConfigParser()
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/output')
 
 
 @app.route('/')
@@ -29,7 +29,7 @@ def get_job_status():
         status = kv.read_store(conn,"{0}_status".format(job_id))
         if status == "COMPLETED\r":
             kv.close_store_connection(conn)
-            return "DONE"
+            return send_from_directory('output',filename='output_{}.txt'.format(job_id))
         else:
             kv.close_store_connection(conn)
             return status
