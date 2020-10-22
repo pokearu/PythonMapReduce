@@ -176,9 +176,17 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
     [kv.delete_command(kv_conn,"{0}_config".format(job_id)) for job_id in mapper_jobids]
     [kv.delete_command(kv_conn,"{0}_config".format(job_id)) for job_id in reducer_jobids]
 
+def status_update(status: str):
+    res = kv.set_command(kv_conn, job_id + '_status',len(status.encode()),status)
+    if res != "STORED\r\n":
+        logging.error("Status set failure : %s",res)
+        logging.critical("ABORTING")
+        exit()
+
 def main():
     try:
         logging.info("Starting MapReduce Job : %s", job_id)
+        status_update("STARTED")
         logging.info("Step 0 : Initializing Mapper and Reducer Job IDs")
         mapper_jobids = get_mapper_jobids()
         reducer_jobids = get_reducer_jobids()
@@ -198,6 +206,7 @@ def main():
 
         logging.info("Step 4 : Waiting for mappers to finish")
         wait_for_mappers(mapper_jobids)
+        status_update("MAPPERS COMPLETED")
 
         logging.info("Step 5 : Starting the Reducer Nodes")
         status = start_reducer_jobs(reducer_jobids)
@@ -209,9 +218,13 @@ def main():
 
         logging.info("Step 7 : Waiting for reducers to finish")
         wait_for_reducers(reducer_jobids)
+        status_update("REDUCERS COMPLETED")
 
         logging.info("Step 8 : Consolidating output file")
         consolidate_output(reducer_jobids,config.get('master','output_file'))
+
+        logging.info("Updating status as completed")
+        status_update("COMPLETED")
     except Exception as e:
         logging.critical("JOB FAILED : %s",e)
     finally:
