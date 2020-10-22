@@ -23,7 +23,7 @@ def hello():
 @app.route('/getjobstatus', methods = ['GET'])
 def get_job_status():
     try:
-        job_id = request.args.get
+        job_id = request.args.get('jobid')
         logging.info("Getting status for job : {0}".format(job_id))
         conn = kv.get_store_connection()
         status = kv.read_store(conn,"{0}_status".format(job_id))
@@ -61,4 +61,4 @@ def map_reduce():
 if __name__ == '__main__':
     logging.basicConfig(filename='server.log', format='%(asctime)s %(levelname)s %(message)s', 
         level=logging.DEBUG)
-    app.run('10.142.0.7', port=9248)
+    app.run(port=9248)
