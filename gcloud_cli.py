@@ -16,6 +16,7 @@ def create_vm(instance_name:str, zone:str, startup_script:str) -> str:
     if 'RUNNING' in stdout:
         logging.info("%s CREATED with status RUNNING", instance_name)
         return 'RUNNING\r'
+    logging.warning("Cannot determine reason of failure. %s", stderr)
     raise Exception("gcloud VM creation failed", instance_name)
 
 def delete_vm(instance_name:str, zone:str):
@@ -31,4 +32,5 @@ def delete_vm(instance_name:str, zone:str):
     if 'Deleted' in stderr:
         logging.info("%s DELETED", instance_name)
         return 'DELETED\r'
+    logging.warning("Cannot determine reason of failure. %s", stderr)
     raise Exception("gcloud VM deleteion failed", instance_name)
