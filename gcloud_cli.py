@@ -6,7 +6,7 @@ def create_vm(instance_name:str, zone:str, startup_script:str) -> str:
     '''
     This function runs a gcloud cli command to create compute VM
     '''
-    gcloud_command = "gcloud compute instances create {0} --zone={1} --format=csv[no-heading](status) --metadata startup-script='{2}'".format(instance_name,
+    gcloud_command = "gcloud compute instances create {0} --zone={1} --format='csv[no-heading](status)' --metadata startup-script='{2}'".format(instance_name,
         zone, startup_script)
     process = subprocess.run(gcloud_command, shell=True, capture_output=True)
     stdout, stderr = process.stdout.decode(encoding='utf-8'), process.stderr.decode(encoding='utf-8')
