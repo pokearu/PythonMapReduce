@@ -41,4 +41,4 @@ def map_reduce():
 
 
 if __name__ == '__main__':
-    app.run(port=80)
+    app.run('10.142.0.7', port=80)
