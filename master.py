@@ -17,7 +17,7 @@ kv_conn = kv.get_store_connection()
 def process_data_file(file_path: str, mapper_jobids: list):
     split_input = {}
     nodes = len(mapper_jobids)
-    data_input = open(file_path, 'r', encoding = "utf8", errors='ignore')
+    data_input = open("./books/{0}".format(file_path), 'r', encoding = "utf8", errors='ignore')
     count = 0
     while True:
         line = data_input.readline()
@@ -227,6 +227,7 @@ def main():
         status_update("COMPLETED")
     except Exception as e:
         logging.critical("JOB FAILED : %s",e)
+        status_update("JOB FAILED")
     finally:
         logging.info("Step 9 : Clean up VMs and intermediate data")
         clean_up(mapper_jobids, reducer_jobids)
