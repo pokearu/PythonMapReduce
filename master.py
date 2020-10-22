@@ -178,6 +178,7 @@ def clean_up(mapper_jobids: list, reducer_jobids: list):
 
 def main():
     try:
+        logging.info("Starting MapReduce Job : %s", job_id)
         logging.info("Step 0 : Initializing Mapper and Reducer Job IDs")
         mapper_jobids = get_mapper_jobids()
         reducer_jobids = get_reducer_jobids()

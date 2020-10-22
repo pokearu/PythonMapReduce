@@ -33,8 +33,8 @@ def map_reduce():
         config['reducer'] = map_reduce_config['reducer']
         with open('master_{0}.ini'.format(mapreduce_job_id), 'w') as configfile:
             config.write(configfile)
-        subprocess.Popen(['python', 'master.py', mapreduce_job_id])
-        return { "job_id" : mapreduce_job_id }
+        subprocess.Popen(['python3', 'master.py', mapreduce_job_id])
+        return str({ "job_id" : mapreduce_job_id })
     except Exception as e:
         print(e)
         return "ERROR : Job Initilization failed"
