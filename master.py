@@ -190,10 +190,8 @@ def main():
             logging.debug("All Mappers have started")
         
         logging.info("Step 2 : Distribute the Input files")
-        input_files = json.loads(config.get('master','input_file'))
+        input_files = json.loads(config.get('master','input_file').replace("'", '"'))
         split_status = [process_data_file(file_path, mapper_jobids) for file_path in input_files]
-        if all(status == "DONE\r" for status in split_status):
-            logging.debug("Completed data set distribution")
         
         logging.info("Step 3 : Update the mapper configs")
         update_mapper_config(mapper_jobids, reducer_jobids)
