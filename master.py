@@ -4,10 +4,13 @@ import configparser
 import uuid
 import json
 import logging
+import sys
 import gcloud_cli as gcli
 
+job_id = sys.argv[1]
+
 config = configparser.ConfigParser()
-config.read('master.ini')
+config.read('master_{0}.ini'.format(job_id))
 
 kv_conn = kv.get_store_connection()
 

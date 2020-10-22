@@ -2,7 +2,7 @@ import socket
 import configparser
 
 config = configparser.ConfigParser()
-config.read('master.ini')
+config.read('kv.ini')
 
 def set_command(conn: socket.socket, key: str, size: int, value: str) -> str:
     set_message = "set {0} {1}\r\n{2}\r\n".format(key,size,value)
