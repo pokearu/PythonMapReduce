@@ -11,17 +11,18 @@ app = Flask(__name__, static_url_path='/output')
 
 @app.route('/')
 def hello():
-    return "Hello World!"
+    '''
+    Welcome Route
+    '''
+    return "Welcome to MapReduce"
 
-
-# @app.route('/getjoboptions', methods = ['GET'])
-# def get_job_options():
-#     try:
-
-#     except Exception as e:
 
 @app.route('/getjobstatus', methods = ['GET'])
 def get_job_status():
+    '''
+    This API route is used to get the current Job status given a Job ID
+    Returns Job output if the Job has completed
+    '''
     try:
         job_id = request.args.get('jobid')
         logging.info("Getting status for job : {0}".format(job_id))
@@ -34,13 +35,16 @@ def get_job_status():
             kv.close_store_connection(conn)
             return status
     except Exception as e:
-        logging.error("Job Initilization failed : %s", e)
+        logging.error("Job status check failed : %s", e)
         kv.close_store_connection(conn)
-        return "ERROR : Job Initilization failed"
+        return "ERROR : Job status check failed"
 
 
 @app.route('/mapreduce', methods = ['POST'])
 def map_reduce():
+    '''
+    This API route is used to trigger a MapReduce Job and returns the Job ID for tracking
+    '''
     try:
         mapreduce_job_id = str(uuid.uuid1())
         map_reduce_config = request.json
