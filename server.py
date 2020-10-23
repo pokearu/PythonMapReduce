@@ -77,6 +77,6 @@ def map_reduce():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='server.txt', format='%(asctime)s %(levelname)s %(message)s', 
+    logging.basicConfig(filename='server.log', format='%(asctime)s %(levelname)s %(message)s', 
         level=logging.DEBUG)
     app.run('10.142.0.7', port=9248)
