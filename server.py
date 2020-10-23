@@ -16,6 +16,20 @@ def hello():
     '''
     return "Welcome to MapReduce"
 
+@app.route('/getjoblog', methods = ['GET'])
+def get_job_log():
+    '''
+    This API route is used to get the logs of the MapReduce Job ID 
+    '''
+    try:
+        job_id = request.args.get('jobid')
+        logging.info("Getting log for job : {0}".format(job_id))
+        return send_from_directory('output',filename='masterlog_{}.txt'.format(job_id))
+    except Exception as e:
+        logging.error("Job log fetch failed : %s", e)
+        kv.close_store_connection(conn)
+        return "ERROR : Job log fetch failed"
+
 
 @app.route('/getjobstatus', methods = ['GET'])
 def get_job_status():
@@ -63,6 +77,6 @@ def map_reduce():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='server.log', format='%(asctime)s %(levelname)s %(message)s', 
+    logging.basicConfig(filename='server.txt', format='%(asctime)s %(levelname)s %(message)s', 
         level=logging.DEBUG)
-    app.run('10.142.0.7', port=9248)
+    app.run(port=9248)

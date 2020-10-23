@@ -257,6 +257,7 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename='master.log', format='%(asctime)s %(levelname)s %(message)s', 
+    log_file = "./output/masterlog_{0}.txt".format(job_id)
+    logging.basicConfig(filename=log_file, format='%(asctime)s %(levelname)s %(message)s', 
         level=logging.DEBUG)
     main()
